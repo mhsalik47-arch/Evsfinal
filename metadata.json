@@ -1,5 +1,5 @@
 {
-  "name": "Shiksha Setu - EVS School Management",
+  "name": "EVS - School Management",
   "description": "A comprehensive school construction and finance management system for partners Master Mujahir and Dr. Salik, featuring income/expense tracking and labour management.",
   "requestFramePermissions": [
     "geolocation"

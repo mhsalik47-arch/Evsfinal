@@ -1,17 +1,18 @@
-
 {
-  "short_name": "Shiksha Setu",
-  "name": "Shiksha Setu - EVS School Management",
+  "short_name": "EVS",
+  "name": "EVS - School Management",
   "icons": [
     {
-      "src": "https://img.icons8.com/fluency/512/school.png",
+      "src": "https://img.icons8.com/fluency/512/environmental-protection.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
-      "src": "https://img.icons8.com/fluency/512/school.png",
+      "src": "https://img.icons8.com/fluency/512/environmental-protection.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
     }
   ],
   "start_url": ".",

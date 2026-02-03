@@ -1,7 +1,6 @@
-
 export const translations = {
     en: {
-        appName: "Shiksha Setu",
+        appName: "EVS",
         dashboard: "Dashboard",
         income: "Income",
         expense: "Expenses",
@@ -100,7 +99,7 @@ export const translations = {
         "Other Material": "Other Material"
     },
     hi: {
-        appName: "शिक्षा सेतु",
+        appName: "EVS",
         dashboard: "डैशबोर्ड",
         income: "पैसे आए",
         expense: "पैसे गए",
