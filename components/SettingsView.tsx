@@ -110,6 +110,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
         link.click();
     };
 
+    const handleOpenSheet = () => {
+        if (settings.googleSheetLink) {
+            window.open(settings.googleSheetLink, '_blank');
+        } else {
+            alert("कृपया पहले अपनी Google Sheet का लिंक यहाँ डालें।");
+        }
+    };
+
     return (
         <div className="space-y-6 pb-20 animate-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-xl font-bold text-slate-800">{t.settings}</h2>
@@ -127,24 +135,48 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
                         <HelpCircle size={20} />
                     </button>
                 </div>
-                <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Apps Script URL</label>
-                    <input 
-                        type="url" 
-                        placeholder="https://script.google.com/macros/s/..." 
-                        className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs outline-none focus:border-green-200 transition-all font-medium"
-                        value={settings.googleSheetUrl || ''}
-                        onChange={e => onUpdate({...settings, googleSheetUrl: e.target.value})}
-                    />
+                
+                <div className="space-y-4">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Apps Script URL (सिंक के लिए)</label>
+                        <input 
+                            type="url" 
+                            placeholder="https://script.google.com/..." 
+                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs outline-none focus:border-green-200 transition-all font-medium"
+                            value={settings.googleSheetUrl || ''}
+                            onChange={e => onUpdate({...settings, googleSheetUrl: e.target.value})}
+                        />
+                    </div>
+                    
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Sheet Link (खोलने के लिए)</label>
+                        <input 
+                            type="url" 
+                            placeholder="https://docs.google.com/spreadsheets/..." 
+                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xs outline-none focus:border-blue-200 transition-all font-medium"
+                            value={settings.googleSheetLink || ''}
+                            onChange={e => onUpdate({...settings, googleSheetLink: e.target.value})}
+                        />
+                    </div>
                 </div>
-                <button 
-                    onClick={handleSyncToGoogleSheets}
-                    disabled={isSyncingSheets}
-                    className="w-full py-4 bg-green-600 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-green-100"
-                >
-                    {isSyncingSheets ? <Loader2 className="animate-spin" size={18} /> : <Cloud size={18} />}
-                    {t.syncSheetNow}
-                </button>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <button 
+                        onClick={handleSyncToGoogleSheets}
+                        disabled={isSyncingSheets}
+                        className="py-4 bg-green-600 text-white rounded-2xl font-black text-[10px] flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-all shadow-lg shadow-green-100 uppercase"
+                    >
+                        {isSyncingSheets ? <Loader2 className="animate-spin" size={16} /> : <Cloud size={16} />}
+                        Sync Data
+                    </button>
+                    <button 
+                        onClick={handleOpenSheet}
+                        className="py-4 bg-slate-800 text-white rounded-2xl font-black text-[10px] flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-slate-200 uppercase"
+                    >
+                        <ExternalLink size={16} />
+                        Open Sheet
+                    </button>
+                </div>
             </div>
 
             {/* Excel Export Card */}
@@ -268,6 +300,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
                                 <p className="text-[10px] text-amber-800 font-bold leading-relaxed flex items-start gap-2">
                                     <span className="mt-0.5">•</span>
                                     Apps Script URL को Google Sheet के 'Extensions' -> 'Apps Script' -> 'Deploy' से प्राप्त करें।
+                                </p>
+                                <p className="text-[10px] text-amber-800 font-bold mt-2 leading-relaxed flex items-start gap-2">
+                                    <span className="mt-0.5">•</span>
+                                    Sheet Link में अपनी ब्राउज़र एड्रेस बार से पूरा URL (docs.google.com/...) कॉपी करके डालें।
                                 </p>
                             </div>
                         </div>

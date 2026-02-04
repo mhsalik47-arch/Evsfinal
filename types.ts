@@ -1,4 +1,3 @@
-
 export type PaymentMode = 'Cash' | 'Bank' | 'UPI' | 'Check';
 export type IncomeSource = 'Investment' | 'Loan' | 'Donation' | 'Other';
 export type ExpenseCategory = 'Material' | 'Labour' | 'Food' | 'Transport' | 'Utility' | 'Contractor' | 'Other';
@@ -75,5 +74,6 @@ export interface AppSettings {
     language: 'en' | 'hi';
     autoSync: boolean;
     syncEmail?: string;
-    googleSheetUrl?: string; // URL for Google Apps Script sync
+    googleSheetUrl?: string; // Web App Script URL
+    googleSheetLink?: string; // Direct Spreadsheet Link
 }
