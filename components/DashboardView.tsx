@@ -20,19 +20,19 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
     const partnerStatsBreakdown = useMemo(() => {
         const calculateForPartner = (name: string) => {
             // 1. Direct Income injections
-            const directIncome = incomes
+            const directIncome = (incomes || [])
                 .filter(i => i.paidBy === name)
-                .reduce((sum, i) => sum + i.amount, 0);
+                .reduce((sum, i) => sum + (i.amount || 0), 0);
             
             // 2. Out of pocket expenses
-            const oopExpenses = expenses
+            const oopExpenses = (expenses || [])
                 .filter(e => e.paidBy === name)
-                .reduce((sum, e) => sum + e.amount, 0);
+                .reduce((sum, e) => sum + (e.amount || 0), 0);
             
             // 3. Out of pocket labour payments
-            const oopPayments = payments
+            const oopPayments = (payments || [])
                 .filter(p => p.paidBy === name)
-                .reduce((sum, p) => sum + p.amount, 0);
+                .reduce((sum, p) => sum + (p.amount || 0), 0);
 
             return {
                 name,
@@ -49,16 +49,16 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
     }, [incomes, expenses, payments]);
 
     const totalIncome = useMemo(() => {
-        const directIncomeTotal = incomes.reduce((sum, item) => sum + item.amount, 0);
+        const directIncomeTotal = (incomes || []).reduce((sum, item) => sum + (item.amount || 0), 0);
         
         // Include everything paid by partners that wasn't a direct income record
-        const oopExpenses = expenses
+        const oopExpenses = (expenses || [])
             .filter(e => e.paidBy === 'Master Mujahir' || e.paidBy === 'Dr. Salik')
-            .reduce((sum, e) => sum + e.amount, 0);
+            .reduce((sum, e) => sum + (e.amount || 0), 0);
             
-        const oopPayments = payments
+        const oopPayments = (payments || [])
             .filter(p => p.paidBy === 'Master Mujahir' || p.paidBy === 'Dr. Salik')
-            .reduce((sum, p) => sum + p.amount, 0);
+            .reduce((sum, p) => sum + (p.amount || 0), 0);
 
         return directIncomeTotal + oopExpenses + oopPayments;
     }, [incomes, expenses, payments]);
@@ -67,13 +67,13 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
         let earningsTotal = 0;
         let paymentsTotal = 0;
 
-        labours.forEach(l => {
-            const att = attendance.filter(a => String(a.labourId) === String(l.id));
+        (labours || []).forEach(l => {
+            const att = (attendance || []).filter(a => String(a.labourId) === String(l.id));
             const totalDays = att.reduce((acc, curr) => acc + (curr.status === 'Present' ? 1 : curr.status === 'Half-Day' ? 0.5 : 0), 0);
             const totalOT = att.reduce((acc, curr) => acc + (curr.overtimeHours || 0), 0);
             const earned = (totalDays * l.dailyWage) + (totalOT * (l.dailyWage / 8));
             
-            const paid = payments.filter(p => String(p.labourId) === String(l.id)).reduce((acc, curr) => acc + curr.amount, 0);
+            const paid = (payments || []).filter(p => String(p.labourId) === String(l.id)).reduce((acc, curr) => acc + curr.amount, 0);
             
             earningsTotal += earned;
             paymentsTotal += paid;
@@ -83,7 +83,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
     }, [labours, attendance, payments]);
 
     const totalExpense = useMemo(() => {
-        const directExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+        const directExpenses = (expenses || []).reduce((sum, item) => sum + (item.amount || 0), 0);
         return directExpenses + labourStats.paymentsTotal;
     }, [expenses, labourStats.paymentsTotal]);
 
@@ -113,7 +113,6 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
                         </div>
                     </div>
                 </div>
-                {/* Decorative blobs */}
                 <div className="absolute top-[-40px] right-[-40px] w-64 h-64 bg-blue-400/20 rounded-full blur-[80px]"></div>
                 <div className="absolute bottom-[-20px] left-[-20px] w-40 h-40 bg-rose-500/10 rounded-full blur-[60px]"></div>
             </div>
@@ -136,7 +135,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
                 />
             </div>
 
-            {/* Partner Tracking - Rebuilt for better OOP tracking */}
+            {/* Partner Tracking */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
                 <div className="flex justify-between items-center mb-6">
                     <div>
@@ -165,7 +164,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
                 </div>
             </div>
 
-            {/* Recharts Chart Section */}
+            {/* Cashflow Chart */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100">
                 <h3 className="font-black text-slate-800 text-xs mb-6 uppercase tracking-[0.15em]">Cashflow Overview</h3>
                 <div className="h-48 w-full">

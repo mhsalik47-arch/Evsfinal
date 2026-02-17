@@ -1,10 +1,10 @@
 
-const CACHE_NAME = 'shiksha-setu-v2'; // Version bumped to v2
+const CACHE_NAME = 'evs-school-v3'; // Bumped to v3 to force update
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://img.icons8.com/fluency/512/school.png'
+  'https://img.icons8.com/fluency/512/environmental-protection.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -22,12 +22,14 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     })
   );
+  self.clients.claim(); // Immediately control all clients
 });
 
 self.addEventListener('fetch', (event) => {

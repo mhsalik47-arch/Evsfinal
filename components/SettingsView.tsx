@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { AppSettings, Income, Expense, LabourProfile, Attendance, LabourPayment, Vendor } from '../types';
-import { Trash2, Download, FileJson, Cloud, Loader2, Table, HelpCircle, X, ExternalLink, Info, Search, ShieldAlert, Copy, CheckCircle, PlusCircle, Settings } from 'lucide-react';
+import { Trash2, Download, FileJson, Cloud, Loader2, Table, HelpCircle, X, ExternalLink, Info, Search, ShieldAlert, Copy, CheckCircle, PlusCircle, Settings, RefreshCw } from 'lucide-react';
 
 interface SettingsViewProps {
     settings: AppSettings;
@@ -24,6 +24,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
     const [isSyncingSheets, setIsSyncingSheets] = useState(false);
     const [showSetupGuide, setShowSetupGuide] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const scriptCode = `function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -57,6 +58,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
 
   return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
 }`;
+
+    const handleForceRefresh = async () => {
+        setIsRefreshing(true);
+        if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+                await registration.unregister();
+            }
+        }
+        // Clear caches
+        if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            for (const name of cacheNames) {
+                await caches.delete(name);
+            }
+        }
+        window.location.reload();
+    };
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(scriptCode);
@@ -128,6 +147,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
     return (
         <div className="space-y-6 pb-20 animate-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-xl font-bold text-slate-800">{t.settings}</h2>
+
+            {/* Force Update Section */}
+            <div className="bg-blue-600 p-6 rounded-[32px] text-white shadow-lg space-y-3">
+                <div className="flex items-center gap-3">
+                    <RefreshCw className={isRefreshing ? "animate-spin" : ""} size={20} />
+                    <h3 className="font-bold text-sm">App Update (v1.0.3)</h3>
+                </div>
+                <p className="text-[10px] opacity-80 leading-relaxed font-medium">अगर आपने GitHub पर बदलाव किए हैं और ऐप में नहीं दिख रहे, तो नीचे दबाएं:</p>
+                <button 
+                    onClick={handleForceRefresh}
+                    disabled={isRefreshing}
+                    className="w-full py-3 bg-white/20 hover:bg-white/30 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-white/20 active:scale-95 transition-all"
+                >
+                    {isRefreshing ? "Updating..." : "Force Update Now (नया बदलाव लोड करें)"}
+                </button>
+            </div>
 
             {/* Cloud Sync Section */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 space-y-4">
