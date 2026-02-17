@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { AppSettings, Income, Expense, LabourProfile, Attendance, LabourPayment, Vendor } from '../types';
 import { Trash2, Download, FileJson, Cloud, Loader2, Table, HelpCircle, X, ExternalLink, Info, Search, ShieldAlert, Copy, CheckCircle, PlusCircle, Settings } from 'lucide-react';
@@ -21,38 +22,37 @@ interface SettingsViewProps {
 const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset, onImport, t, allData }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isSyncingSheets, setIsSyncingSheets] = useState(false);
-    const [showHelp, setShowHelp] = useState(false);
     const [showSetupGuide, setShowSetupGuide] = useState(false);
     const [copied, setCopied] = useState(false);
 
-    // Advanced Script that handles multiple types of data and auto-creates tabs
     const scriptCode = `function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var data = JSON.parse(e.postData.contents);
   var payload = data.data;
 
-  // 1. Sync Income
-  var sheetIncome = ss.getSheetByName("Incomes") || ss.insertSheet("Incomes");
+  // 1. Sync Income (Direct Cash Injections)
+  var sheetIncome = ss.getSheetByName("Direct_Incomes") || ss.insertSheet("Direct_Incomes");
   sheetIncome.clear();
   sheetIncome.appendRow(["Date", "Amount", "Source", "Paid By", "Mode", "Remarks"]);
   payload.incomes.forEach(function(i) {
     sheetIncome.appendRow([i.date, i.amount, i.source, i.paidBy, i.mode, i.remarks]);
   });
 
-  // 2. Sync Expenses
+  // 2. Sync All Expenses
   var sheetExpense = ss.getSheetByName("Expenses") || ss.insertSheet("Expenses");
   sheetExpense.clear();
-  sheetExpense.appendRow(["Date", "Amount", "Category", "Paid To", "Mode", "Notes"]);
+  sheetExpense.appendRow(["Date", "Amount", "Category", "Paid To", "Payment Source", "Mode", "Notes"]);
   payload.expenses.forEach(function(e) {
-    sheetExpense.appendRow([e.date, e.amount, e.category, e.paidTo, e.mode, e.notes]);
+    sheetExpense.appendRow([e.date, e.amount, e.category, e.paidTo, e.paidBy, e.mode, e.notes]);
   });
 
-  // 3. Sync Labour Attendance & Payments
-  var sheetLabour = ss.getSheetByName("Labour_Summary") || ss.insertSheet("Labour_Summary");
-  sheetLabour.clear();
-  sheetLabour.appendRow(["Labour Name", "Mobile", "Work Type", "Daily Wage"]);
-  payload.labours.forEach(function(l) {
-    sheetLabour.appendRow([l.name, l.mobile, l.workType, l.dailyWage]);
+  // 3. Sync Labour Payments
+  var sheetPayments = ss.getSheetByName("Labour_Payments") || ss.insertSheet("Labour_Payments");
+  sheetPayments.clear();
+  sheetPayments.appendRow(["Date", "Labour Name", "Amount", "Paid From", "Mode", "Type"]);
+  payload.payments.forEach(function(p) {
+    var worker = payload.labours.find(function(l) { return String(l.id) === String(p.labourId) });
+    sheetPayments.appendRow([p.date, worker ? worker.name : "Unknown", p.amount, p.paidBy, p.mode, p.type]);
   });
 
   return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
@@ -97,16 +97,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
     };
 
     const handleExportExcel = () => {
-        let csv = "\ufeffSECTION: INCOME\nDate,Amount,Source,Paid By,Mode,Remarks\n";
+        let csv = "\ufeffSECTION: DIRECT INCOME\nDate,Amount,Source,Paid By,Mode,Remarks\n";
         allData.incomes.forEach(i => csv += `${i.date},${i.amount},${i.source},${i.paidBy},${i.mode},"${(i.remarks || '').replace(/"/g, '""')}"\n`);
         
-        csv += "\nSECTION: EXPENSES\nDate,Amount,Category,Paid To,Mode,Notes\n";
-        allData.expenses.forEach(e => csv += `${e.date},${e.amount},${e.category},"${(e.paidTo || '').replace(/"/g, '""')}",${e.mode},"${(e.notes || '').replace(/"/g, '""')}"\n`);
+        csv += "\nSECTION: EXPENSES\nDate,Amount,Category,Paid To,Source,Mode,Notes\n";
+        allData.expenses.forEach(e => csv += `${e.date},${e.amount},${e.category},"${(e.paidTo || '').replace(/"/g, '""')}",${e.paidBy},${e.mode},"${(e.notes || '').replace(/"/g, '""')}"\n`);
+        
+        csv += "\nSECTION: LABOUR PAYMENTS\nDate,Labour Name,Amount,Paid From,Mode\n";
+        allData.payments.forEach(p => {
+            const worker = allData.labours.find(l => String(l.id) === String(p.labourId));
+            csv += `${p.date},${worker ? worker.name : 'Unknown'},${p.amount},${p.paidBy},${p.mode}\n`;
+        });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `EVS_Report_${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = `EVS_Full_Report_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
     };
 
@@ -123,47 +129,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
         <div className="space-y-6 pb-20 animate-in slide-in-from-bottom-4 duration-500">
             <h2 className="text-xl font-bold text-slate-800">{t.settings}</h2>
 
-            {/* Main Sync Card */}
+            {/* Cloud Sync Section */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="bg-green-50 p-2.5 rounded-2xl text-green-600">
-                            <Table size={22} />
-                        </div>
+                        <div className="bg-green-50 p-2.5 rounded-2xl text-green-600"><Table size={22} /></div>
                         <h3 className="font-bold text-slate-800 text-sm">Google Sheets Cloud</h3>
                     </div>
                     <button onClick={() => setShowSetupGuide(true)} className="text-blue-600 flex items-center gap-1 font-bold text-[9px] bg-blue-50 px-3 py-1.5 rounded-full uppercase tracking-wider">
                         <PlusCircle size={14} /> Setup New
                     </button>
                 </div>
-                
                 <div className="space-y-3">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">1. Apps Script URL (सिंक के लिए)</label>
-                        <input 
-                            type="url" 
-                            placeholder="https://script.google.com/macros/s/..." 
-                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[11px] outline-none focus:border-green-300 font-bold"
-                            value={settings.googleSheetUrl || ''}
-                            onChange={e => onUpdate({...settings, googleSheetUrl: e.target.value})}
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">2. Sheet Link (खोलने के लिए)</label>
-                        <input 
-                            type="url" 
-                            placeholder="https://docs.google.com/spreadsheets/d/..." 
-                            className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[11px] outline-none focus:border-blue-300 font-bold"
-                            value={settings.googleSheetLink || ''}
-                            onChange={e => onUpdate({...settings, googleSheetLink: e.target.value})}
-                        />
-                    </div>
+                    <input type="url" placeholder="Apps Script URL" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[11px] outline-none" value={settings.googleSheetUrl || ''} onChange={e => onUpdate({...settings, googleSheetUrl: e.target.value})} />
+                    <input type="url" placeholder="Google Sheet Link" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[11px] outline-none" value={settings.googleSheetLink || ''} onChange={e => onUpdate({...settings, googleSheetLink: e.target.value})} />
                 </div>
-
                 <div className="grid grid-cols-2 gap-3">
-                    <button onClick={handleSyncToGoogleSheets} disabled={isSyncingSheets} className="py-4 bg-green-600 text-white rounded-2xl font-black text-[10px] flex items-center justify-center gap-2 uppercase tracking-widest shadow-lg shadow-green-100 active:scale-95 transition-all">
-                        {isSyncingSheets ? <Loader2 className="animate-spin" size={16} /> : <Cloud size={16} />} 
-                        {isSyncingSheets ? 'Syncing...' : 'Sync Data'}
+                    <button onClick={handleSyncToGoogleSheets} disabled={isSyncingSheets} className="py-4 bg-green-600 text-white rounded-2xl font-black text-[10px] flex items-center justify-center gap-2 uppercase tracking-widest shadow-lg active:scale-95 transition-all">
+                        {isSyncingSheets ? <Loader2 className="animate-spin" size={16} /> : <Cloud size={16} />} Sync Cloud
                     </button>
                     <button onClick={handleOpenSheet} className="py-4 bg-slate-800 text-white rounded-2xl font-black text-[10px] flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 transition-all">
                         <ExternalLink size={16} /> Open Sheet
@@ -176,46 +159,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
                 <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="bg-white w-full max-w-md rounded-[40px] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">New Sheet Setup (गाइड)</h3>
-                            <button onClick={() => setShowSetupGuide(false)} className="bg-slate-100 p-2 rounded-full active:scale-90 transition-all">
-                                <X size={24} />
-                            </button>
+                            <h3 className="text-xl font-black text-slate-800">Setup Cloud Sync</h3>
+                            <button onClick={() => setShowSetupGuide(false)} className="bg-slate-100 p-2 rounded-full active:scale-90"><X size={24} /></button>
                         </div>
-                        
-                        <div className="space-y-5 overflow-y-auto max-h-[65vh] pr-2 scrollbar-hide">
-                            <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100">
-                                <h4 className="text-blue-800 font-black text-xs mb-3 flex items-center gap-2">STEP 1: Create Spreadsheet</h4>
-                                <p className="text-[11px] font-bold text-blue-700/80 mb-4 leading-relaxed">एक नई गूगल शीट बनाएं और उसका लिंक कॉपी करके एप में "Sheet Link" बॉक्स में डालें।</p>
-                                <button onClick={() => window.open('https://sheets.new', '_blank')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest active:scale-95">Create New Sheet</button>
-                            </div>
-
+                        <div className="space-y-5 overflow-y-auto max-h-[60vh] pr-2 scrollbar-hide">
                             <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                                 <h4 className="text-slate-800 font-black text-xs mb-3 flex items-center justify-between">
-                                    STEP 2: Apps Script Code
-                                    <button onClick={copyToClipboard} className="text-blue-600 flex items-center gap-1">
-                                        {copied ? <CheckCircle size={14} /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy'}
-                                    </button>
+                                    Copy Script Code
+                                    <button onClick={copyToClipboard} className="text-blue-600 flex items-center gap-1">{copied ? <CheckCircle size={14} /> : <Copy size={14} />} Copy</button>
                                 </h4>
-                                <p className="text-[10px] text-slate-500 font-bold mb-3">शीट में 'Extensions' -> 'Apps Script' पर क्लिक करें और पुराना सब हटाकर यह कोड पेस्ट करें।</p>
-                                <pre className="text-[8px] bg-slate-900 text-blue-300 p-3 rounded-xl overflow-x-auto font-mono">
-                                    {scriptCode.substring(0, 150)}...
-                                </pre>
+                                <pre className="text-[8px] bg-slate-900 text-blue-300 p-3 rounded-xl overflow-x-auto font-mono">{scriptCode.substring(0, 150)}...</pre>
                             </div>
-
-                            <div className="bg-rose-50 p-5 rounded-3xl border border-rose-100">
-                                <h4 className="text-rose-800 font-black text-xs mb-3">STEP 3: Authorize & Deploy</h4>
-                                <p className="text-[11px] font-bold text-rose-700/80 leading-relaxed mb-3">
-                                    1. <b>'Run'</b> बटन दबाएं और Permission <b>'Allow'</b> करें।<br/>
-                                    2. <b>'Deploy'</b> -> <b>'New Deployment'</b> करें।<br/>
-                                    3. Access को <b>'Anyone'</b> पर सेट करें।<br/>
-                                    4. मिले हुए URL को एप में पेस्ट करें।
-                                </p>
-                            </div>
+                            <p className="text-[11px] font-bold text-slate-600">शीट्स में 'Extensions' -> 'Apps Script' में कोड पेस्ट करें, 'Run' दबाकर Permission दें और फिर 'Deploy' करें।</p>
                         </div>
-
-                        <button onClick={() => setShowSetupGuide(false)} className="w-full mt-6 py-5 bg-slate-900 text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl">
-                            Close Setup Guide
-                        </button>
+                        <button onClick={() => setShowSetupGuide(false)} className="w-full mt-6 py-5 bg-slate-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest">Close Guide</button>
                     </div>
                 </div>
             )}
@@ -223,8 +180,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
             {/* Offline Backups */}
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 space-y-4">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Reports & Local Backups</h3>
-                <button onClick={handleExportExcel} className="w-full py-5 bg-emerald-600 text-white rounded-[24px] font-black text-xs flex items-center justify-center gap-3 shadow-lg shadow-emerald-100 active:scale-95">
-                    <Download size={18} /> Excel Report Download
+                <button onClick={handleExportExcel} className="w-full py-5 bg-emerald-600 text-white rounded-[24px] font-black text-xs flex items-center justify-center gap-3 shadow-lg active:scale-95">
+                    <Download size={18} /> Download Excel Report
                 </button>
                 <div className="grid grid-cols-2 gap-3">
                     <button onClick={handleDownloadJSON} className="p-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] flex items-center justify-center gap-2 uppercase tracking-wider active:scale-95">

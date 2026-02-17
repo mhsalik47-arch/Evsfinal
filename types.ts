@@ -1,3 +1,4 @@
+
 export type PaymentMode = 'Cash' | 'Bank' | 'UPI' | 'Check';
 export type IncomeSource = 'Investment' | 'Loan' | 'Donation' | 'Other';
 export type ExpenseCategory = 'Material' | 'Labour' | 'Food' | 'Transport' | 'Utility' | 'Contractor' | 'Other';
@@ -8,7 +9,7 @@ export type FoodSubCategory = 'Tea/Snacks' | 'Lunch' | 'Dinner' | 'Water' | 'Oth
 
 export type ExpenseSubCategory = LabourSubCategory | MaterialSubCategory | FoodSubCategory | string;
 
-export type Partner = 'Master Mujahir' | 'Dr. Salik' | 'Other';
+export type Partner = 'Master Mujahir' | 'Dr. Salik' | 'Project Balance' | 'Other';
 export type AttendanceStatus = 'Present' | 'Absent' | 'Half-Day';
 
 export interface Vendor {
@@ -36,7 +37,8 @@ export interface Expense {
     category: ExpenseCategory;
     subCategory?: ExpenseSubCategory;
     paidTo: string;
-    vendorId?: string; // ID of the saved vendor
+    paidBy: Partner;
+    vendorId?: string;
     mode: PaymentMode;
     notes: string;
     synced: boolean;
@@ -65,6 +67,7 @@ export interface LabourPayment {
     amount: number;
     type: 'Advance' | 'Full Payment';
     mode: PaymentMode;
+    paidBy: Partner;
 }
 
 export interface AppSettings {
@@ -74,6 +77,6 @@ export interface AppSettings {
     language: 'en' | 'hi';
     autoSync: boolean;
     syncEmail?: string;
-    googleSheetUrl?: string; // Web App Script URL
-    googleSheetLink?: string; // Direct Spreadsheet Link
+    googleSheetUrl?: string;
+    googleSheetLink?: string;
 }

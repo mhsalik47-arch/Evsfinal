@@ -40,7 +40,7 @@ const App: React.FC = () => {
     const renderView = () => {
         switch (activeTab) {
             case 'dashboard': return <DashboardView incomes={incomes} expenses={expenses} labours={labours} attendance={attendance} payments={payments} t={t} settings={settings} />;
-            case 'income': return <IncomeView incomes={incomes} onAdd={actions.addIncome} onUpdate={actions.updateIncome} onDelete={actions.deleteIncome} t={t} />;
+            case 'income': return <IncomeView incomes={incomes} expenses={expenses} payments={payments} onAdd={actions.addIncome} onUpdate={actions.updateIncome} onDelete={actions.deleteIncome} t={t} />;
             case 'expense': return <ExpenseView expenses={expenses} payments={payments} labours={labours} vendors={vendors} onAdd={actions.addExpense} onUpdate={actions.updateExpense} onDelete={actions.deleteExpense} onDeletePayment={actions.deletePayment} onAddVendor={actions.addVendor} onUpdateVendor={actions.updateVendor} onDeleteVendor={actions.deleteVendor} t={t} />;
             case 'labour': return (
                 <LabourView 
