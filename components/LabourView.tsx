@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Users, Plus, X, Calendar, Wallet, UserPlus, Pencil, Trash2, CheckCheck, Clock, History, User } from 'lucide-react';
+import { Users, Plus, X, Calendar, Wallet, UserPlus, Pencil, Trash2, CheckCheck, Clock, History, User, MessageCircle } from 'lucide-react';
 import { LabourProfile, Attendance, LabourPayment, AttendanceStatus, PaymentMode, Partner } from '../types';
 
 interface LabourViewProps {
@@ -32,6 +32,7 @@ const LabourView: React.FC<LabourViewProps> = ({
     const [selectedLabour, setSelectedLabour] = useState<LabourProfile | null>(null);
     const [isRecordingAttendance, setIsRecordingAttendance] = useState(false);
     const [isPaying, setIsPaying] = useState(false);
+    const [isEditingPayment, setIsEditingPayment] = useState(false);
     const [isBulkAttendance, setIsBulkAttendance] = useState(false);
     const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
     
@@ -59,6 +60,31 @@ const LabourView: React.FC<LabourViewProps> = ({
     }, [attendance]);
 
     const getWorkerName = (id: string) => labours.find(l => String(l.id) === String(id))?.name || 'Unknown';
+    const getWorkerMobile = (id: string) => labours.find(l => String(l.id) === String(id))?.mobile || '';
+
+    const shareOnWhatsApp = (mobile: string, message: string) => {
+        if (!mobile) {
+            alert("Mobile number not found!");
+            return;
+        }
+        const cleanMobile = mobile.replace(/\D/g, '');
+        const whatsappUrl = `https://wa.me/91${cleanMobile}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+    };
+
+    const handleShareAttendance = (a: Attendance) => {
+        const worker = labours.find(l => String(l.id) === String(a.labourId));
+        if (!worker) return;
+        const msg = `*Attendance Update*\n\nName: ${worker.name}\nDate: ${a.date}\nStatus: ${a.status}\nOvertime: ₹${a.overtimeHours}\n\n_Sent via EVS App_`;
+        shareOnWhatsApp(worker.mobile, msg);
+    };
+
+    const handleSharePayment = (p: LabourPayment) => {
+        const worker = labours.find(l => String(l.id) === String(p.labourId));
+        if (!worker) return;
+        const msg = `*Payment Received*\n\nName: ${worker.name}\nDate: ${p.date}\nAmount: ₹${p.amount}\nMode: ${p.mode}\n\n_Sent via EVS App_`;
+        shareOnWhatsApp(worker.mobile, msg);
+    };
 
     const handleMarkAllPresent = () => {
         setSelectedWorkers(new Set(labours.map(l => l.id)));
@@ -113,6 +139,23 @@ const LabourView: React.FC<LabourViewProps> = ({
         });
         setIsEditingLabour(true);
         setIsAddingLabour(true);
+    };
+
+    const handleEditPayment = (p: LabourPayment) => {
+        const labour = labours.find(l => String(l.id) === String(p.labourId));
+        if (labour) {
+            setSelectedLabour(labour);
+            setPayForm({
+                id: p.id,
+                amount: p.amount.toString(),
+                date: p.date,
+                type: p.type,
+                mode: p.mode,
+                paidBy: p.paidBy
+            } as any);
+            setIsEditingPayment(true);
+            setIsPaying(true);
+        }
     };
 
     const handleAddLabourSubmit = (e: React.FormEvent) => {
@@ -183,7 +226,7 @@ const LabourView: React.FC<LabourViewProps> = ({
 
                                 <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-50">
                                     <div className="text-center">
-                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{t.earned}</p>
+                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{t.earned} ({l.totalDays} दिन)</p>
                                         <p className="text-xs font-black text-slate-800">₹{l.earnings.toLocaleString()}</p>
                                     </div>
                                     <div className="text-center border-x border-slate-50">
@@ -241,6 +284,13 @@ const LabourView: React.FC<LabourViewProps> = ({
                                     </div>
                                     <div className="flex gap-1">
                                         <button 
+                                            onClick={() => handleShareAttendance(a)}
+                                            className="p-2 text-emerald-600 bg-emerald-50 rounded-lg active:scale-90"
+                                            title="Share on WhatsApp"
+                                        >
+                                            <MessageCircle size={14}/>
+                                        </button>
+                                        <button 
                                             onClick={() => handleEditAttendance(a)}
                                             className="p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-90"
                                         >
@@ -278,7 +328,22 @@ const LabourView: React.FC<LabourViewProps> = ({
                                         <p className={`text-[9px] font-bold uppercase tracking-tighter ${p.paidBy === 'Project Balance' ? 'text-amber-600' : 'text-blue-600'}`}>Paid From: {p.paidBy}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => onDeletePayment(p.id)} className="text-rose-400 p-1"><Trash2 size={16}/></button>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleSharePayment(p)}
+                                        className="p-2 text-emerald-600 bg-emerald-50 rounded-lg active:scale-90"
+                                        title="Share on WhatsApp"
+                                    >
+                                        <MessageCircle size={16}/>
+                                    </button>
+                                    <button 
+                                        onClick={() => handleEditPayment(p)}
+                                        className="p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-90"
+                                    >
+                                        <Pencil size={16}/>
+                                    </button>
+                                    <button onClick={() => onDeletePayment(p.id)} className="text-rose-400 p-1"><Trash2 size={16}/></button>
+                                </div>
                             </div>
                         ))
                     )}
@@ -380,13 +445,27 @@ const LabourView: React.FC<LabourViewProps> = ({
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
                     <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl max-h-[95vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-slate-800">{selectedLabour.name} - {t.payments}</h3>
-                            <button onClick={() => setIsPaying(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
+                            <h3 className="text-xl font-black text-slate-800">{selectedLabour.name} - {isEditingPayment ? 'Edit Payment' : t.payments}</h3>
+                            <button onClick={() => { setIsPaying(false); setIsEditingPayment(false); }} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
                         </div>
                         <form className="space-y-5 pb-10" onSubmit={e => {
                             e.preventDefault();
-                            onAddPayment({ id: Date.now().toString(), labourId: selectedLabour.id, date: payForm.date, amount: parseFloat(payForm.amount), type: payForm.type, mode: payForm.mode, paidBy: payForm.paidBy });
+                            const pData: LabourPayment = { 
+                                id: isEditingPayment ? (payForm as any).id : Date.now().toString(), 
+                                labourId: selectedLabour.id, 
+                                date: payForm.date, 
+                                amount: parseFloat(payForm.amount), 
+                                type: payForm.type, 
+                                mode: payForm.mode, 
+                                paidBy: payForm.paidBy 
+                            };
+                            if (isEditingPayment) {
+                                onUpdatePayment(pData);
+                            } else {
+                                onAddPayment(pData);
+                            }
                             setIsPaying(false);
+                            setIsEditingPayment(false);
                         }}>
                             <div className="text-center py-4 bg-slate-50 rounded-3xl border border-slate-100">
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Amount to Pay</span>

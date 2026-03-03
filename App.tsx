@@ -22,7 +22,7 @@ const App: React.FC = () => {
     const { incomes, expenses, labours, attendance, payments, vendors, settings, actions } = useStore();
     const [activeTab, setActiveTab] = useState('dashboard');
     const [isOnline, setIsOnline] = useState(navigator.onLine);
-    const APP_VERSION = '1.0.9';
+    const APP_VERSION = '1.1.1';
 
     useEffect(() => {
         const lastVersion = localStorage.getItem('app_version');
