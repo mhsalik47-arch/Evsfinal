@@ -19,26 +19,21 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
     // Detailed Partner Statistics Calculation
     const partnerStatsBreakdown = useMemo(() => {
         const calculateForPartner = (name: string) => {
-            // 1. Direct Income injections
+            // 1. Direct Income injections (excluding auto-generated ones)
             const directIncome = (incomes || [])
-                .filter(i => i.paidBy === name)
+                .filter(i => i.paidBy === name && !i.id.startsWith('auto-inc'))
                 .reduce((sum, i) => sum + (i.amount || 0), 0);
             
-            // 2. Out of pocket expenses
-            const oopExpenses = (expenses || [])
-                .filter(e => e.paidBy === name)
-                .reduce((sum, e) => sum + (e.amount || 0), 0);
+            // 2. Auto-generated incomes (which represent out-of-pocket spending)
+            const oopSpending = (incomes || [])
+                .filter(i => i.paidBy === name && i.id.startsWith('auto-inc'))
+                .reduce((sum, i) => sum + (i.amount || 0), 0);
             
-            // 3. Out of pocket labour payments
-            const oopPayments = (payments || [])
-                .filter(p => p.paidBy === name)
-                .reduce((sum, p) => sum + (p.amount || 0), 0);
-
             return {
                 name,
                 direct: directIncome,
-                spent: oopExpenses + oopPayments,
-                total: directIncome + oopExpenses + oopPayments
+                spent: oopSpending,
+                total: directIncome + oopSpending
             };
         };
 
@@ -46,22 +41,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ incomes, expenses, labour
             mujahir: calculateForPartner('Master Mujahir'),
             salik: calculateForPartner('Dr. Salik')
         };
-    }, [incomes, expenses, payments]);
+    }, [incomes]);
 
     const totalIncome = useMemo(() => {
-        const directIncomeTotal = (incomes || []).reduce((sum, item) => sum + (item.amount || 0), 0);
-        
-        // Include everything paid by partners that wasn't a direct income record
-        const oopExpenses = (expenses || [])
-            .filter(e => e.paidBy === 'Master Mujahir' || e.paidBy === 'Dr. Salik')
-            .reduce((sum, e) => sum + (e.amount || 0), 0);
-            
-        const oopPayments = (payments || [])
-            .filter(p => p.paidBy === 'Master Mujahir' || p.paidBy === 'Dr. Salik')
-            .reduce((sum, p) => sum + (p.amount || 0), 0);
-
-        return directIncomeTotal + oopExpenses + oopPayments;
-    }, [incomes, expenses, payments]);
+        return (incomes || []).reduce((sum, item) => sum + (item.amount || 0), 0);
+    }, [incomes]);
     
     const labourStats = useMemo(() => {
         let earningsTotal = 0;

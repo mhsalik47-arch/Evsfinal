@@ -152,7 +152,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
             <div className="bg-blue-600 p-6 rounded-[32px] text-white shadow-lg space-y-3">
                 <div className="flex items-center gap-3">
                     <RefreshCw className={isRefreshing ? "animate-spin" : ""} size={20} />
-                    <h3 className="font-bold text-sm">App Update (v1.0.3)</h3>
+                    <h3 className="font-bold text-sm">App Update (v1.0.7)</h3>
                 </div>
                 <p className="text-[10px] opacity-80 leading-relaxed font-medium">अगर आपने GitHub पर बदलाव किए हैं और ऐप में नहीं दिख रहे, तो नीचे दबाएं:</p>
                 <button 
@@ -205,7 +205,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
                                 </h4>
                                 <pre className="text-[8px] bg-slate-900 text-blue-300 p-3 rounded-xl overflow-x-auto font-mono">{scriptCode.substring(0, 150)}...</pre>
                             </div>
-                            <p className="text-[11px] font-bold text-slate-600">शीट्स में 'Extensions' -> 'Apps Script' में कोड पेस्ट करें, 'Run' दबाकर Permission दें और फिर 'Deploy' करें।</p>
+                            <p className="text-[11px] font-bold text-slate-600">शीट्स में 'Extensions' {'->'} 'Apps Script' में कोड पेस्ट करें, 'Run' दबाकर Permission दें और फिर 'Deploy' करें।</p>
                         </div>
                         <button onClick={() => setShowSetupGuide(false)} className="w-full mt-6 py-5 bg-slate-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest">Close Guide</button>
                     </div>

@@ -22,6 +22,19 @@ const App: React.FC = () => {
     const { incomes, expenses, labours, attendance, payments, vendors, settings, actions } = useStore();
     const [activeTab, setActiveTab] = useState('dashboard');
     const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const APP_VERSION = '1.0.7';
+
+    useEffect(() => {
+        const lastVersion = localStorage.getItem('app_version');
+        if (lastVersion && lastVersion !== APP_VERSION) {
+            console.log('New version detected, clearing cache...');
+            // Optional: clear specific caches or just reload
+            localStorage.setItem('app_version', APP_VERSION);
+            window.location.reload();
+        } else {
+            localStorage.setItem('app_version', APP_VERSION);
+        }
+    }, []);
 
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
@@ -110,6 +123,9 @@ const App: React.FC = () => {
                 <NavButton active={activeTab === 'expense'} onClick={() => setActiveTab('expense')} icon={<TrendingDown size={20} />} label={t.expense} />
                 <NavButton active={activeTab === 'labour'} onClick={() => setActiveTab('labour')} icon={<Users size={20} />} label={t.labour} />
                 <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<SettingsIcon size={20} />} label={t.settings} />
+                <div className="absolute -top-4 right-2 bg-slate-800 text-white text-[8px] px-1.5 py-0.5 rounded-full opacity-30 font-mono">
+                    v{APP_VERSION}
+                </div>
             </nav>
         </div>
     );

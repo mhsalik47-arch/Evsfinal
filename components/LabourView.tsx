@@ -51,15 +51,62 @@ const LabourView: React.FC<LabourViewProps> = ({
         return [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [payments]);
 
+    const sortedAttendance = useMemo(() => {
+        return [...attendance].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [attendance]);
+
     const getWorkerName = (id: string) => labours.find(l => String(l.id) === String(id))?.name || 'Unknown';
 
+    const handleMarkAllPresent = () => {
+        const today = new Date().toISOString().split('T')[0];
+        if (window.confirm(`Mark all ${labours.length} workers as Present for today (${today})?`)) {
+            labours.forEach(l => {
+                onAddAttendance({
+                    id: `att-${l.id}-${today}`,
+                    labourId: l.id,
+                    date: today,
+                    status: 'Present',
+                    overtimeHours: 0
+                });
+            });
+        }
+    };
+
+    const handleEditAttendance = (a: Attendance) => {
+        const labour = labours.find(l => String(l.id) === String(a.labourId));
+        if (labour) {
+            setSelectedLabour(labour);
+            setAttForm({
+                date: a.date,
+                status: a.status,
+                overtime: a.overtimeHours.toString()
+            });
+            setIsRecordingAttendance(true);
+        }
+    };
+
+    const handleAddLabourSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onAddLabour({
+            id: Date.now().toString(),
+            name: labourForm.name,
+            mobile: labourForm.mobile,
+            workType: labourForm.workType,
+            dailyWage: parseFloat(labourForm.dailyWage) || 0
+        });
+        setIsAddingLabour(false);
+        setLabourForm({ name: '', mobile: '', workType: 'Mistry', dailyWage: '' });
+    };
+
     return (
-        <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-500 pb-10">
-            {/* Header and Nav Buttons remain same... */}
-            <div className="flex bg-slate-200/50 p-1 rounded-2xl sticky top-16 z-40 backdrop-blur-md">
+        <div className="flex flex-col gap-4 animate-in slide-in-from-bottom-4 duration-500 pb-10">
+            <div className="flex bg-slate-200/50 p-1 rounded-2xl sticky top-0 z-40 backdrop-blur-md">
                 {(['profiles', 'attendance', 'payments'] as const).map(v => (
-                    <button key={v} onClick={() => setView(v)} className={`flex-1 py-2 text-[10px] font-bold rounded-xl transition-all ${view === v ? 'bg-white text-primary-blue shadow-sm' : 'text-slate-500'}`}>
+                    <button key={v} onClick={() => setView(v)} className={`flex-1 py-2 text-[10px] font-bold rounded-xl transition-all relative ${view === v ? 'bg-white text-primary-blue shadow-sm' : 'text-slate-500'}`}>
                         {t[v] || v.toUpperCase()}
+                        {v === 'attendance' && (
+                            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[6px] px-1 rounded-full animate-pulse">NEW</span>
+                        )}
                     </button>
                 ))}
             </div>
@@ -92,8 +139,8 @@ const LabourView: React.FC<LabourViewProps> = ({
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={() => { setSelectedLabour(l); setIsRecordingAttendance(true); }} className="bg-slate-50 text-slate-700 py-3 rounded-2xl text-[10px] font-bold border border-slate-100">Attendance</button>
-                                    <button onClick={() => { setSelectedLabour(l); setIsPaying(true); }} className="bg-blue-600 text-white py-3 rounded-2xl text-[10px] font-bold shadow-lg shadow-blue-100">Pay Now</button>
+                                    <button onClick={() => { setSelectedLabour(l); setAttForm({ date: new Date().toISOString().split('T')[0], status: 'Present', overtime: '0' }); setIsRecordingAttendance(true); }} className="bg-slate-50 text-slate-700 py-3 rounded-2xl text-[10px] font-bold border border-slate-100">Attendance</button>
+                                    <button onClick={() => { setSelectedLabour(l); setPayForm({ amount: l.balance.toString(), date: new Date().toISOString().split('T')[0], type: 'Full Payment', mode: 'Cash', paidBy: 'Project Balance' }); setIsPaying(true); }} className="bg-blue-600 text-white py-3 rounded-2xl text-[10px] font-bold shadow-lg shadow-blue-100">Pay Now</button>
                                 </div>
                             </div>
                         ))}
@@ -101,25 +148,175 @@ const LabourView: React.FC<LabourViewProps> = ({
                 </>
             )}
 
-            {view === 'payments' && (
-                <div className="space-y-3">
-                    {sortedPayments.map(p => (
-                        <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <History size={18} className="text-blue-400" />
-                                <div>
-                                    <p className="font-bold text-slate-800">₹ {p.amount.toLocaleString()}</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{getWorkerName(p.labourId)} • {p.date}</p>
-                                    <p className={`text-[9px] font-bold uppercase tracking-tighter ${p.paidBy === 'Project Balance' ? 'text-amber-600' : 'text-blue-600'}`}>Paid From: {p.paidBy}</p>
-                                </div>
+            {view === 'attendance' && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-bold text-slate-800">{t.attendance}</h2>
+                        <button 
+                            onClick={handleMarkAllPresent}
+                            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-bold shadow-md active:scale-95 transition-all"
+                        >
+                            <CheckCheck size={16} />
+                            {t.markAllPresent}
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        {sortedAttendance.length === 0 ? (
+                            <div className="text-center py-10 bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400">
+                                <History size={40} className="mx-auto mb-2 opacity-20" />
+                                <p className="font-bold text-sm">No attendance records</p>
                             </div>
-                            <button onClick={() => onDeletePayment(p.id)} className="text-rose-400 p-1"><Trash2 size={16}/></button>
-                        </div>
-                    ))}
+                        ) : (
+                            sortedAttendance.map(a => (
+                                <div key={a.id} className="bg-white p-3 rounded-2xl border border-slate-100 flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs ${
+                                            a.status === 'Present' ? 'bg-emerald-500' : a.status === 'Half-Day' ? 'bg-amber-500' : 'bg-rose-500'
+                                        }`}>
+                                            {a.status.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-800 text-xs">{getWorkerName(a.labourId)}</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase">{a.date} {a.overtimeHours > 0 && `• OT: ${a.overtimeHours}h`}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <button 
+                                            onClick={() => handleEditAttendance(a)}
+                                            className="p-2 text-blue-600 bg-blue-50 rounded-lg active:scale-90"
+                                        >
+                                            <Pencil size={14}/>
+                                        </button>
+                                        <button 
+                                            onClick={() => onDeleteAttendance(a.id)}
+                                            className="p-2 text-rose-600 bg-rose-50 rounded-lg active:scale-90"
+                                        >
+                                            <Trash2 size={14}/>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             )}
 
-            {/* Attendance modal same... */}
+            {view === 'payments' && (
+                <div className="space-y-3">
+                    {sortedPayments.length === 0 ? (
+                        <div className="text-center py-10 bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400">
+                            <Wallet size={40} className="mx-auto mb-2 opacity-20" />
+                            <p className="font-bold text-sm">No payment records</p>
+                        </div>
+                    ) : (
+                        sortedPayments.map(p => (
+                            <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <History size={18} className="text-blue-400" />
+                                    <div>
+                                        <p className="font-bold text-slate-800">₹ {p.amount.toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">{getWorkerName(p.labourId)} • {p.date}</p>
+                                        <p className={`text-[9px] font-bold uppercase tracking-tighter ${p.paidBy === 'Project Balance' ? 'text-amber-600' : 'text-blue-600'}`}>Paid From: {p.paidBy}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => onDeletePayment(p.id)} className="text-rose-400 p-1"><Trash2 size={16}/></button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {isAddingLabour && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-black text-slate-800">Add New Labour</h3>
+                            <button onClick={() => setIsAddingLabour(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
+                        </div>
+                        <form className="space-y-5 pb-6" onSubmit={handleAddLabourSubmit}>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label>
+                                <input type="text" required className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={labourForm.name} onChange={e => setLabourForm({...labourForm, name: e.target.value})} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Mobile</label>
+                                <input type="tel" className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={labourForm.mobile} onChange={e => setLabourForm({...labourForm, mobile: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Work Type</label>
+                                    <select className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={labourForm.workType} onChange={e => setLabourForm({...labourForm, workType: e.target.value})}>
+                                        {['Mistry', 'Majdoor', 'Plumber', 'Electrician', 'Painter', 'Carpenter'].map(t => (
+                                            <option key={t} value={t}>{t}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Daily Wage</label>
+                                    <input type="number" required className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={labourForm.dailyWage} onChange={e => setLabourForm({...labourForm, dailyWage: e.target.value})} />
+                                </div>
+                            </div>
+                            <button type="submit" className="w-full py-5 bg-primary-blue text-white rounded-[24px] font-black text-lg uppercase shadow-2xl active:scale-95 transition-all">
+                                {t.save}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {isRecordingAttendance && selectedLabour && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-black text-slate-800">{selectedLabour.name} - {t.attendance}</h3>
+                            <button onClick={() => setIsRecordingAttendance(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
+                        </div>
+                        <form className="space-y-5 pb-6" onSubmit={e => {
+                            e.preventDefault();
+                            onAddAttendance({
+                                id: `att-${selectedLabour.id}-${attForm.date}`,
+                                labourId: selectedLabour.id,
+                                date: attForm.date,
+                                status: attForm.status,
+                                overtimeHours: parseFloat(attForm.overtime) || 0
+                            });
+                            setIsRecordingAttendance(false);
+                        }}>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Date</label>
+                                <input type="date" className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={attForm.date} onChange={e => setAttForm({...attForm, date: e.target.value})} />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Status</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {(['Present', 'Half-Day', 'Absent'] as AttendanceStatus[]).map(s => (
+                                        <button
+                                            key={s}
+                                            type="button"
+                                            onClick={() => setAttForm({...attForm, status: s})}
+                                            className={`p-3 rounded-2xl text-[10px] font-bold transition-all border ${
+                                                attForm.status === s 
+                                                ? (s === 'Present' ? 'bg-emerald-600 text-white border-emerald-600' : s === 'Half-Day' ? 'bg-amber-600 text-white border-amber-600' : 'bg-rose-600 text-white border-rose-600')
+                                                : 'bg-white text-slate-600 border-slate-200'
+                                            }`}
+                                        >
+                                            {t[s] || s}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">{t.overtime}</label>
+                                <input type="number" step="0.5" className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={attForm.overtime} onChange={e => setAttForm({...attForm, overtime: e.target.value})} />
+                            </div>
+                            <button type="submit" className="w-full py-5 bg-primary-blue text-white rounded-[24px] font-black text-lg uppercase shadow-2xl active:scale-95 transition-all">
+                                {t.save}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {isPaying && selectedLabour && (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">

@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'evs-school-v3'; // Bumped to v3 to force update
+const CACHE_NAME = 'evs-school-v7'; // Bumped to v7 to force update
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -33,13 +33,20 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Network-first for navigation requests to ensure updates
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => {
+        return caches.match('/index.html');
+      })
+    );
+    return;
+  }
+
+  // Cache-first for other assets
   event.respondWith(
     caches.match(event.request).then((response) => {
-      return response || fetch(event.request).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
+      return response || fetch(event.request);
     })
   );
 });

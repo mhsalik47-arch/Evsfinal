@@ -35,65 +35,34 @@ const IncomeView: React.FC<IncomeViewProps> = ({
         date: new Date().toISOString().split('T')[0]
     });
 
-    // Merged History: Direct Income + Partner Spending
-    const mergedHistory = useMemo(() => {
-        const direct = incomes.map(i => ({
+    // Merged History: Direct Income + Partner Spending (now handled by store auto-incomes)
+    const history = useMemo(() => {
+        return incomes.map(i => ({
             ...i,
-            type: 'direct',
-            label: 'Direct Fund'
-        }));
-
-        // Filter expenses paid by partners personally
-        const personalExpenses = expenses
-            .filter(e => e.paidBy === 'Master Mujahir' || e.paidBy === 'Dr. Salik')
-            .map(e => ({
-                id: e.id,
-                amount: e.amount,
-                date: e.date,
-                source: 'Out-of-pocket' as any,
-                paidBy: e.paidBy,
-                mode: e.mode,
-                remarks: `Spent on: ${e.paidTo} (${e.category})`,
-                type: 'spent_expense',
-                label: 'Personal Spend'
-            }));
-
-        // Filter labour payments paid by partners personally
-        const personalPayments = payments
-            .filter(p => p.paidBy === 'Master Mujahir' || p.paidBy === 'Dr. Salik')
-            .map(p => ({
-                id: p.id,
-                amount: p.amount,
-                date: p.date,
-                source: 'Out-of-pocket' as any,
-                paidBy: p.paidBy,
-                mode: p.mode,
-                remarks: `Labour Payment (${p.type})`,
-                type: 'spent_labour',
-                label: 'Personal Spend'
-            }));
-
-        return [...direct, ...personalExpenses, ...personalPayments]
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [incomes, expenses, payments]);
+            isAuto: i.id.startsWith('auto-inc'),
+            label: i.id.startsWith('auto-inc') ? 'Partner Spend' : 'Direct Fund'
+        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [incomes]);
 
     const filteredHistory = useMemo(() => {
-        if (!searchTerm) return mergedHistory;
+        if (!searchTerm) return history;
         const s = searchTerm.toLowerCase();
-        return mergedHistory.filter(h => 
+        return history.filter(h => 
             h.paidBy.toLowerCase().includes(s) || 
             h.remarks.toLowerCase().includes(s) ||
             h.amount.toString().includes(s)
         );
-    }, [mergedHistory, searchTerm]);
+    }, [history, searchTerm]);
 
     const stats = useMemo(() => {
-        const directTotal = incomes.reduce((s, i) => s + i.amount, 0);
-        const spentTotal = mergedHistory
-            .filter(h => h.type !== 'direct')
-            .reduce((s, h) => s + h.amount, 0);
+        const directTotal = incomes
+            .filter(i => !i.id.startsWith('auto-inc'))
+            .reduce((s, i) => s + i.amount, 0);
+        const spentTotal = incomes
+            .filter(i => i.id.startsWith('auto-inc'))
+            .reduce((s, i) => s + i.amount, 0);
         return { directTotal, spentTotal };
-    }, [incomes, mergedHistory]);
+    }, [incomes]);
 
     const openAdd = () => {
         setEditingId(null);
@@ -104,7 +73,7 @@ const IncomeView: React.FC<IncomeViewProps> = ({
     };
 
     const openEdit = (income: any) => {
-        if (income.type !== 'direct') {
+        if (income.isAuto) {
             alert("Note: This transaction was recorded via Expenses/Labour and must be edited there.");
             return;
         }
@@ -150,9 +119,9 @@ const IncomeView: React.FC<IncomeViewProps> = ({
         }
     };
 
-    const handleDelete = (e: React.MouseEvent, id: string, type: string) => {
+    const handleDelete = (e: React.MouseEvent, id: string, isAuto: boolean) => {
         e.stopPropagation();
-        if (type !== 'direct') {
+        if (isAuto) {
             alert("Please delete personal spending from the Expenses/Labour tab.");
             return;
         }
@@ -222,13 +191,13 @@ const IncomeView: React.FC<IncomeViewProps> = ({
                             className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex justify-between items-center group active:bg-slate-50 transition-colors"
                         >
                             <div className="flex items-center gap-3">
-                                <div className={`p-3 rounded-2xl ${item.type === 'direct' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                                    {item.type === 'direct' ? <ArrowUpRight size={20} /> : <HandCoins size={20} />}
+                                <div className={`p-3 rounded-2xl ${!item.isAuto ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                    {!item.isAuto ? <ArrowUpRight size={20} /> : <HandCoins size={20} />}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-slate-800">₹ {item.amount.toLocaleString()}</p>
-                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${item.type === 'direct' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${!item.isAuto ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                                             {item.label}
                                         </span>
                                     </div>
@@ -244,9 +213,9 @@ const IncomeView: React.FC<IncomeViewProps> = ({
                                 <div className="text-right mr-1">
                                     <span className="text-[8px] font-bold px-2 py-0.5 bg-slate-100 rounded-full text-slate-500 uppercase tracking-widest">{item.mode}</span>
                                 </div>
-                                {item.type === 'direct' && (
+                                {!item.isAuto && (
                                     <button 
-                                        onClick={(e) => handleDelete(e, item.id, item.type)} 
+                                        onClick={(e) => handleDelete(e, item.id, item.isAuto)} 
                                         className="p-2.5 text-rose-400 bg-rose-50 rounded-xl active:scale-90"
                                     >
                                         <Trash2 size={14}/>
