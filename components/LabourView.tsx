@@ -28,11 +28,14 @@ const LabourView: React.FC<LabourViewProps> = ({
 }) => {
     const [view, setView] = useState<'profiles' | 'attendance' | 'payments'>('profiles');
     const [isAddingLabour, setIsAddingLabour] = useState(false);
+    const [isEditingLabour, setIsEditingLabour] = useState(false);
     const [selectedLabour, setSelectedLabour] = useState<LabourProfile | null>(null);
     const [isRecordingAttendance, setIsRecordingAttendance] = useState(false);
     const [isPaying, setIsPaying] = useState(false);
+    const [isBulkAttendance, setIsBulkAttendance] = useState(false);
+    const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
     
-    const [labourForm, setLabourForm] = useState({ name: '', mobile: '', workType: 'Mistry', dailyWage: '' });
+    const [labourForm, setLabourForm] = useState({ id: '', name: '', mobile: '', workType: 'Mistry', dailyWage: '' });
     const [attForm, setAttForm] = useState({ date: new Date().toISOString().split('T')[0], status: 'Present' as AttendanceStatus, overtime: '0' });
     const [payForm, setPayForm] = useState({ amount: '', date: new Date().toISOString().split('T')[0], type: 'Full Payment' as any, mode: 'Cash' as PaymentMode, paidBy: 'Project Balance' as Partner });
 
@@ -40,10 +43,10 @@ const LabourView: React.FC<LabourViewProps> = ({
         return labours.map(l => {
             const att = attendance.filter(a => String(a.labourId) === String(l.id));
             const totalDays = att.reduce((acc, curr) => acc + (curr.status === 'Present' ? 1 : curr.status === 'Half-Day' ? 0.5 : 0), 0);
-            const totalOT = att.reduce((acc, curr) => acc + (curr.overtimeHours || 0), 0);
-            const earnings = (totalDays * l.dailyWage) + (totalOT * (l.dailyWage / 8));
+            const totalOTAmount = att.reduce((acc, curr) => acc + (curr.overtimeHours || 0), 0);
+            const earnings = (totalDays * l.dailyWage) + totalOTAmount;
             const totalPaid = payments.filter(p => String(p.labourId) === String(l.id)).reduce((acc, curr) => acc + curr.amount, 0);
-            return { ...l, totalDays, totalOT, earnings, totalPaid, balance: earnings - totalPaid };
+            return { ...l, totalDays, totalOTAmount, earnings, totalPaid, balance: earnings - totalPaid };
         });
     }, [labours, attendance, payments]);
 
@@ -58,18 +61,33 @@ const LabourView: React.FC<LabourViewProps> = ({
     const getWorkerName = (id: string) => labours.find(l => String(l.id) === String(id))?.name || 'Unknown';
 
     const handleMarkAllPresent = () => {
-        const today = new Date().toISOString().split('T')[0];
-        if (window.confirm(`Mark all ${labours.length} workers as Present for today (${today})?`)) {
-            labours.forEach(l => {
-                onAddAttendance({
-                    id: `att-${l.id}-${today}`,
-                    labourId: l.id,
-                    date: today,
-                    status: 'Present',
-                    overtimeHours: 0
-                });
+        setSelectedWorkers(new Set(labours.map(l => l.id)));
+        setIsBulkAttendance(true);
+    };
+
+    const handleBulkAttendanceSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const today = attForm.date;
+        selectedWorkers.forEach(id => {
+            onAddAttendance({
+                id: `att-${id}-${today}`,
+                labourId: id,
+                date: today,
+                status: 'Present',
+                overtimeHours: 0
             });
+        });
+        setIsBulkAttendance(false);
+    };
+
+    const toggleWorkerSelection = (id: string) => {
+        const newSelection = new Set(selectedWorkers);
+        if (newSelection.has(id)) {
+            newSelection.delete(id);
+        } else {
+            newSelection.add(id);
         }
+        setSelectedWorkers(newSelection);
     };
 
     const handleEditAttendance = (a: Attendance) => {
@@ -85,17 +103,37 @@ const LabourView: React.FC<LabourViewProps> = ({
         }
     };
 
+    const handleEditLabour = (l: LabourProfile) => {
+        setLabourForm({
+            id: l.id,
+            name: l.name,
+            mobile: l.mobile,
+            workType: l.workType,
+            dailyWage: l.dailyWage.toString()
+        });
+        setIsEditingLabour(true);
+        setIsAddingLabour(true);
+    };
+
     const handleAddLabourSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onAddLabour({
-            id: Date.now().toString(),
+        const labourData: LabourProfile = {
+            id: isEditingLabour ? labourForm.id : Date.now().toString(),
             name: labourForm.name,
             mobile: labourForm.mobile,
             workType: labourForm.workType,
             dailyWage: parseFloat(labourForm.dailyWage) || 0
-        });
+        };
+
+        if (isEditingLabour) {
+            onUpdateLabour(labourData);
+        } else {
+            onAddLabour(labourData);
+        }
+        
         setIsAddingLabour(false);
-        setLabourForm({ name: '', mobile: '', workType: 'Mistry', dailyWage: '' });
+        setIsEditingLabour(false);
+        setLabourForm({ id: '', name: '', mobile: '', workType: 'Mistry', dailyWage: '' });
     };
 
     return (
@@ -115,7 +153,7 @@ const LabourView: React.FC<LabourViewProps> = ({
                 <>
                     <div className="flex justify-between items-center mb-2">
                         <h2 className="text-xl font-bold text-slate-800">{t.labour}</h2>
-                        <button onClick={() => setIsAddingLabour(true)} className="primary-blue text-white p-3 rounded-2xl shadow-lg active:scale-95 transition-all">
+                        <button onClick={() => { setIsEditingLabour(false); setLabourForm({ id: '', name: '', mobile: '', workType: 'Mistry', dailyWage: '' }); setIsAddingLabour(true); }} className="primary-blue text-white p-3 rounded-2xl shadow-lg active:scale-95 transition-all">
                             <Plus size={24} />
                         </button>
                     </div>
@@ -133,11 +171,31 @@ const LabourView: React.FC<LabourViewProps> = ({
                                             <p className="text-[10px] text-slate-400 font-bold">{t[l.workType] || l.workType} • ₹{l.dailyWage}</p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-[8px] font-bold text-rose-500 uppercase">Balance</p>
-                                        <p className="text-base font-black text-slate-900">₹ {l.balance.toLocaleString()}</p>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleEditLabour(l)} className="p-2 text-blue-600 bg-blue-50 rounded-xl active:scale-90">
+                                            <Pencil size={14} />
+                                        </button>
+                                        <button onClick={() => { if(window.confirm(t.confirmDelete)) onDeleteLabour(l.id); }} className="p-2 text-rose-600 bg-rose-50 rounded-xl active:scale-90">
+                                            <Trash2 size={14} />
+                                        </button>
                                     </div>
                                 </div>
+
+                                <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-50">
+                                    <div className="text-center">
+                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{t.earned}</p>
+                                        <p className="text-xs font-black text-slate-800">₹{l.earnings.toLocaleString()}</p>
+                                    </div>
+                                    <div className="text-center border-x border-slate-50">
+                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{t.totalPaid}</p>
+                                        <p className="text-xs font-black text-emerald-600">₹{l.totalPaid.toLocaleString()}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[8px] font-bold text-rose-400 uppercase tracking-tighter">{t.balanceDue}</p>
+                                        <p className="text-xs font-black text-rose-600">₹{l.balance.toLocaleString()}</p>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-2">
                                     <button onClick={() => { setSelectedLabour(l); setAttForm({ date: new Date().toISOString().split('T')[0], status: 'Present', overtime: '0' }); setIsRecordingAttendance(true); }} className="bg-slate-50 text-slate-700 py-3 rounded-2xl text-[10px] font-bold border border-slate-100">Attendance</button>
                                     <button onClick={() => { setSelectedLabour(l); setPayForm({ amount: l.balance.toString(), date: new Date().toISOString().split('T')[0], type: 'Full Payment', mode: 'Cash', paidBy: 'Project Balance' }); setIsPaying(true); }} className="bg-blue-600 text-white py-3 rounded-2xl text-[10px] font-bold shadow-lg shadow-blue-100">Pay Now</button>
@@ -178,7 +236,7 @@ const LabourView: React.FC<LabourViewProps> = ({
                                         </div>
                                         <div>
                                             <p className="font-bold text-slate-800 text-xs">{getWorkerName(a.labourId)}</p>
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase">{a.date} {a.overtimeHours > 0 && `• OT: ${a.overtimeHours}h`}</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase">{a.date} {a.overtimeHours > 0 && `• OT: ₹${a.overtimeHours}`}</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-1">
@@ -229,12 +287,12 @@ const LabourView: React.FC<LabourViewProps> = ({
 
             {isAddingLabour && (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
-                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl">
+                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl max-h-[95vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-black text-slate-800">Add New Labour</h3>
+                            <h3 className="text-xl font-black text-slate-800">{isEditingLabour ? 'Edit Labour' : 'Add New Labour'}</h3>
                             <button onClick={() => setIsAddingLabour(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
                         </div>
-                        <form className="space-y-5 pb-6" onSubmit={handleAddLabourSubmit}>
+                        <form className="space-y-5 pb-10" onSubmit={handleAddLabourSubmit}>
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Name</label>
                                 <input type="text" required className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={labourForm.name} onChange={e => setLabourForm({...labourForm, name: e.target.value})} />
@@ -257,7 +315,7 @@ const LabourView: React.FC<LabourViewProps> = ({
                                     <input type="number" required className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={labourForm.dailyWage} onChange={e => setLabourForm({...labourForm, dailyWage: e.target.value})} />
                                 </div>
                             </div>
-                            <button type="submit" className="w-full py-5 bg-primary-blue text-white rounded-[24px] font-black text-lg uppercase shadow-2xl active:scale-95 transition-all">
+                            <button type="submit" className="w-full py-5 bg-primary-blue text-white rounded-[24px] font-bold text-lg shadow-2xl active:scale-95 transition-all">
                                 {t.save}
                             </button>
                         </form>
@@ -267,12 +325,12 @@ const LabourView: React.FC<LabourViewProps> = ({
 
             {isRecordingAttendance && selectedLabour && (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
-                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl">
+                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl max-h-[95vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-black text-slate-800">{selectedLabour.name} - {t.attendance}</h3>
                             <button onClick={() => setIsRecordingAttendance(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
                         </div>
-                        <form className="space-y-5 pb-6" onSubmit={e => {
+                        <form className="space-y-5 pb-10" onSubmit={e => {
                             e.preventDefault();
                             onAddAttendance({
                                 id: `att-${selectedLabour.id}-${attForm.date}`,
@@ -307,10 +365,10 @@ const LabourView: React.FC<LabourViewProps> = ({
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">{t.overtime}</label>
-                                <input type="number" step="0.5" className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={attForm.overtime} onChange={e => setAttForm({...attForm, overtime: e.target.value})} />
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Overtime Amount (ओवरटाइम के पैसे)</label>
+                                <input type="number" className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={attForm.overtime} onChange={e => setAttForm({...attForm, overtime: e.target.value})} />
                             </div>
-                            <button type="submit" className="w-full py-5 bg-primary-blue text-white rounded-[24px] font-black text-lg uppercase shadow-2xl active:scale-95 transition-all">
+                            <button type="submit" className="w-full py-5 bg-primary-blue text-white rounded-[24px] font-bold text-lg shadow-2xl active:scale-95 transition-all">
                                 {t.save}
                             </button>
                         </form>
@@ -320,12 +378,12 @@ const LabourView: React.FC<LabourViewProps> = ({
 
             {isPaying && selectedLabour && (
                 <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
-                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl">
+                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl max-h-[95vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-black text-slate-800">{selectedLabour.name} - {t.payments}</h3>
                             <button onClick={() => setIsPaying(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
                         </div>
-                        <form className="space-y-5 pb-6" onSubmit={e => {
+                        <form className="space-y-5 pb-10" onSubmit={e => {
                             e.preventDefault();
                             onAddPayment({ id: Date.now().toString(), labourId: selectedLabour.id, date: payForm.date, amount: parseFloat(payForm.amount), type: payForm.type, mode: payForm.mode, paidBy: payForm.paidBy });
                             setIsPaying(false);
@@ -376,8 +434,53 @@ const LabourView: React.FC<LabourViewProps> = ({
                                 </select>
                             </div>
 
-                            <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-black text-lg uppercase shadow-2xl active:scale-95 transition-all">
+                            <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-[24px] font-bold text-lg shadow-2xl active:scale-95 transition-all">
                                 {t.save}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {isBulkAttendance && (
+                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl p-6 animate-in slide-in-from-bottom-10 shadow-2xl max-h-[95vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-black text-slate-800">{t.markAllPresent}</h3>
+                            <button onClick={() => setIsBulkAttendance(false)} className="bg-slate-100 p-2 rounded-full"><X size={20} /></button>
+                        </div>
+                        <form className="space-y-5 pb-10" onSubmit={handleBulkAttendanceSubmit}>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">{t.date}</label>
+                                <input type="date" className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" value={attForm.date} onChange={e => setAttForm({...attForm, date: e.target.value})} />
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">{t.labour}</label>
+                                <div className="space-y-2 max-h-60 overflow-y-auto p-1">
+                                    {labours.map(l => (
+                                        <div 
+                                            key={l.id} 
+                                            onClick={() => toggleWorkerSelection(l.id)}
+                                            className={`p-3 rounded-2xl border flex justify-between items-center cursor-pointer transition-all ${
+                                                selectedWorkers.has(l.id) ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs ${
+                                                    selectedWorkers.has(l.id) ? 'bg-emerald-500' : 'bg-slate-200'
+                                                }`}>
+                                                    {l.name.charAt(0)}
+                                                </div>
+                                                <span className={`text-sm font-bold ${selectedWorkers.has(l.id) ? 'text-emerald-900' : 'text-slate-600'}`}>{l.name}</span>
+                                            </div>
+                                            {selectedWorkers.has(l.id) && <CheckCheck size={16} className="text-emerald-600" />}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button type="submit" className="w-full py-5 bg-emerald-600 text-white rounded-[24px] font-bold text-lg shadow-2xl active:scale-95 transition-all">
+                                {t.save} ({selectedWorkers.size})
                             </button>
                         </form>
                     </div>

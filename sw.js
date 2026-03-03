@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'evs-school-v7'; // Bumped to v7 to force update
+const CACHE_NAME = 'evs-school-v9'; // Bumped to v9 to force update
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
