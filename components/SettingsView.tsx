@@ -26,37 +26,69 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
     const [copied, setCopied] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const scriptCode = `function doPost(e) {
+    const scriptCode = `function doGet(e) {
+  return ContentService.createTextOutput("✅ EVS Cloud Sync is ONLINE!\\n\\nIse browser mein nahi kholna hai. Is URL ko copy karke App ki Settings mein paste karein.")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var data = JSON.parse(e.postData.contents);
   var payload = data.data;
 
-  // 1. Sync Income (Direct Cash Injections)
+  // 1. Sync Income
   var sheetIncome = ss.getSheetByName("Direct_Incomes") || ss.insertSheet("Direct_Incomes");
   sheetIncome.clear();
   sheetIncome.appendRow(["Date", "Amount", "Source", "Paid By", "Mode", "Remarks"]);
-  payload.incomes.forEach(function(i) {
-    sheetIncome.appendRow([i.date, i.amount, i.source, i.paidBy, i.mode, i.remarks]);
-  });
+  if (payload.incomes) {
+    payload.incomes.forEach(function(i) {
+      sheetIncome.appendRow([i.date, i.amount, i.source, i.paidBy, i.mode, i.remarks]);
+    });
+  }
 
-  // 2. Sync All Expenses
+  // 2. Sync Expenses
   var sheetExpense = ss.getSheetByName("Expenses") || ss.insertSheet("Expenses");
   sheetExpense.clear();
-  sheetExpense.appendRow(["Date", "Amount", "Category", "Paid To", "Payment Source", "Mode", "Notes"]);
-  payload.expenses.forEach(function(e) {
-    sheetExpense.appendRow([e.date, e.amount, e.category, e.paidTo, e.paidBy, e.mode, e.notes]);
-  });
+  sheetExpense.appendRow(["Date", "Amount", "Category", "Paid To", "Paid By", "Mode", "Notes"]);
+  if (payload.expenses) {
+    payload.expenses.forEach(function(ex) {
+      sheetExpense.appendRow([ex.date, ex.amount, ex.category, ex.paidTo, ex.paidBy, ex.mode, ex.notes]);
+    });
+  }
 
   // 3. Sync Labour Payments
   var sheetPayments = ss.getSheetByName("Labour_Payments") || ss.insertSheet("Labour_Payments");
   sheetPayments.clear();
-  sheetPayments.appendRow(["Date", "Labour Name", "Amount", "Paid From", "Mode", "Type"]);
-  payload.payments.forEach(function(p) {
-    var worker = payload.labours.find(function(l) { return String(l.id) === String(p.labourId) });
-    sheetPayments.appendRow([p.date, worker ? worker.name : "Unknown", p.amount, p.paidBy, p.mode, p.type]);
-  });
+  sheetPayments.appendRow(["Date", "Labour Name", "Amount", "Paid From", "Mode"]);
+  if (payload.payments && payload.labours) {
+    payload.payments.forEach(function(p) {
+      var worker = payload.labours.find(function(l) { return String(l.id) === String(p.labourId) });
+      sheetPayments.appendRow([p.date, worker ? worker.name : "Unknown", p.amount, p.paidBy, p.mode]);
+    });
+  }
 
-  return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+  // 4. Sync Attendance
+  var sheetAtt = ss.getSheetByName("Labour_Attendance") || ss.insertSheet("Labour_Attendance");
+  sheetAtt.clear();
+  sheetAtt.appendRow(["Date", "Labour Name", "Status", "OT Amount"]);
+  if (payload.attendance && payload.labours) {
+    payload.attendance.forEach(function(a) {
+      var worker = payload.labours.find(function(l) { return String(l.id) === String(a.labourId) });
+      sheetAtt.appendRow([a.date, worker ? worker.name : "Unknown", a.status, a.overtimeHours]);
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({"status": "success"}))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function setup() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ["Direct_Incomes", "Expenses", "Labour_Attendance", "Labour_Payments", "Vendors"];
+  sheets.forEach(function(name) {
+    if (!ss.getSheetByName(name)) ss.insertSheet(name);
+  });
+  console.log("Sheets Ready!");
 }`;
 
     const handleForceRefresh = async () => {
@@ -96,15 +128,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, onReset
                 timestamp: new Date().toLocaleString(),
                 data: allData
             };
+            // Using text/plain to avoid CORS preflight issues with Apps Script
             await fetch(settings.googleSheetUrl, {
                 method: 'POST',
                 mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' },
                 body: JSON.stringify(payload)
             });
-            alert("सिंक पूरा हुआ! अपनी गूगल शीट चेक करें।");
+            alert("सिंक कमांड भेज दी गई है! 10-15 सेकंड इंतज़ार करें और अपनी गूगल शीट चेक करें।");
         } catch (error) {
-            alert("सिंक फेल: क्या आपने Apps Script में 'Run' दबाकर Permission दी थी?");
+            alert("सिंक फेल: नेटवर्क की समस्या या गलत URL।");
         } finally {
             setIsSyncingSheets(false);
         }
