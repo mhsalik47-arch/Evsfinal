@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Users, Plus, X, Calendar, Wallet, UserPlus, Pencil, Trash2, CheckCheck, Clock, History, User, MessageCircle } from 'lucide-react';
+import { Users, Plus, X, Calendar, Wallet, UserPlus, Pencil, Trash2, CheckCheck, Clock, History, User, MessageCircle, Search } from 'lucide-react';
 import { LabourProfile, Attendance, LabourPayment, AttendanceStatus, PaymentMode, Partner } from '../types';
 
 interface LabourViewProps {
@@ -35,6 +35,8 @@ const LabourView: React.FC<LabourViewProps> = ({
     const [isEditingPayment, setIsEditingPayment] = useState(false);
     const [isBulkAttendance, setIsBulkAttendance] = useState(false);
     const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
+    const [attSearch, setAttSearch] = useState('');
+    const [paySearch, setPaySearch] = useState('');
     
     const [labourForm, setLabourForm] = useState({ id: '', name: '', mobile: '', workType: 'Mistry', dailyWage: '' });
     const [attForm, setAttForm] = useState({ date: new Date().toISOString().split('T')[0], status: 'Present' as AttendanceStatus, overtime: '0' });
@@ -52,12 +54,24 @@ const LabourView: React.FC<LabourViewProps> = ({
     }, [labours, attendance, payments]);
 
     const sortedPayments = useMemo(() => {
-        return [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [payments]);
+        let filtered = [...payments];
+        if (paySearch) {
+            filtered = filtered.filter(p => 
+                getWorkerName(p.labourId).toLowerCase().includes(paySearch.toLowerCase())
+            );
+        }
+        return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [payments, paySearch, labours]);
 
     const sortedAttendance = useMemo(() => {
-        return [...attendance].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [attendance]);
+        let filtered = [...attendance];
+        if (attSearch) {
+            filtered = filtered.filter(a => 
+                getWorkerName(a.labourId).toLowerCase().includes(attSearch.toLowerCase())
+            );
+        }
+        return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [attendance, attSearch, labours]);
 
     const getWorkerName = (id: string) => labours.find(l => String(l.id) === String(id))?.name || 'Unknown';
     const getWorkerMobile = (id: string) => labours.find(l => String(l.id) === String(id))?.mobile || '';
@@ -261,6 +275,17 @@ const LabourView: React.FC<LabourViewProps> = ({
                             {t.markAllPresent}
                         </button>
                     </div>
+
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder="नाम से खोजें (Search by name)..." 
+                            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                            value={attSearch}
+                            onChange={e => setAttSearch(e.target.value)}
+                        />
+                    </div>
                     
                     <div className="space-y-2">
                         {sortedAttendance.length === 0 ? (
@@ -312,6 +337,21 @@ const LabourView: React.FC<LabourViewProps> = ({
 
             {view === 'payments' && (
                 <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-bold text-slate-800">{t.payments}</h2>
+                    </div>
+
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder="नाम से खोजें (Search by name)..." 
+                            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-bold outline-none focus:border-blue-500 transition-all"
+                            value={paySearch}
+                            onChange={e => setPaySearch(e.target.value)}
+                        />
+                    </div>
+
                     {sortedPayments.length === 0 ? (
                         <div className="text-center py-10 bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-400">
                             <Wallet size={40} className="mx-auto mb-2 opacity-20" />
