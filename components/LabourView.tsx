@@ -55,20 +55,26 @@ const LabourView: React.FC<LabourViewProps> = ({
 
     const sortedPayments = useMemo(() => {
         let filtered = [...payments];
-        if (paySearch) {
-            filtered = filtered.filter(p => 
-                getWorkerName(p.labourId).toLowerCase().includes(paySearch.toLowerCase())
-            );
+        const search = paySearch.trim().toLowerCase();
+        if (search) {
+            filtered = filtered.filter(p => {
+                const worker = labours.find(l => String(l.id) === String(p.labourId));
+                const name = worker ? worker.name.toLowerCase() : 'unknown';
+                return name.includes(search);
+            });
         }
         return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [payments, paySearch, labours]);
 
     const sortedAttendance = useMemo(() => {
         let filtered = [...attendance];
-        if (attSearch) {
-            filtered = filtered.filter(a => 
-                getWorkerName(a.labourId).toLowerCase().includes(attSearch.toLowerCase())
-            );
+        const search = attSearch.trim().toLowerCase();
+        if (search) {
+            filtered = filtered.filter(a => {
+                const worker = labours.find(l => String(l.id) === String(a.labourId));
+                const name = worker ? worker.name.toLowerCase() : 'unknown';
+                return name.includes(search);
+            });
         }
         return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [attendance, attSearch, labours]);
